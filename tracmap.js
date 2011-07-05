@@ -1,6 +1,7 @@
 
 var map;
 var basic_path;
+var major_path = [];
 var pathObjs = [];
 var majorNodes = [];
 var eventNodes = [];
@@ -549,6 +550,7 @@ function MajorNode(latLng){
         } 
         return result +"N\r\n";
     }
+
     google.maps.event.addListener(this.shape, 'dblclick', bind(this, this.on_dbl_click));
     google.maps.event.addListener(this.shape, 'mousedown', bind(this, this.mouse_down));
     google.maps.event.addListener(this.shape, 'mouseup', bind(this, this.mouse_up));
@@ -668,6 +670,7 @@ function Vehicle(latLng){
         }
     }
     /* implement find closest */
+    /* na */
 }
 
 
@@ -682,6 +685,8 @@ function fix_events(){
             
         });  
 }
+
+
 function create_boom_box(){
     $('#boom_pane').empty();
     if(selected_node != null){
@@ -690,7 +695,7 @@ function create_boom_box(){
             element += ' name="boom_chk_'+i+'" id="boom_chk_'+i+'" class="boom_chk"/>'; 
             element += '<label for="boom_chk_'+i+' class="boom_label">Boom '+(i+1)+'</label><div>'         
             $('#boom_pane').append(element);
-            var chk = $('#boom_chk_'+i)
+            var chk = $('#boom_chk_'+i);
             if(selected_node.booms.length > i && selected_node.booms[i].on){
                 $(chk).attr('checked', true);
             }
@@ -700,6 +705,7 @@ function create_boom_box(){
         }
     }    
 }
+
 	      	
 function addMajorNode(location) {
     var point = new MajorNode(location);
@@ -708,20 +714,34 @@ function addMajorNode(location) {
 	
     if(majorNodes.length == 2){
         drawPath(majorNodes.length-2,majorNodes.length-1);
-        basic_path = new google.maps.Polyline({path:[majorNodes[0].get_pos(),
+        /*basic_path = new google.maps.Polyline({path:[majorNodes[0].get_pos(),
                                                      majorNodes[1].get_pos()],
                                                strokeColor: "#FFFF00",
                                                clickable: false,
-                                               strokeOpacity: 0.3, 
+                                               strokeOpacity: 0.7, 
                                                strokeWeight: 7, zIndex : basic_z });
-        basic_path.setMap(map);
+                                               basic_path.setMap(map);*/
+        major_path.push(new google.maps.Polyline({path:[majorNodes[0].get_pos(),
+                                                        majorNodes[1].get_pos()],
+                        strokeColor: "#FFFF00",
+                        clickable: false,
+                        strokeOpacity: 0.7, 
+                        strokeWeight: 7, zIndex : basic_z }));
+        major_path[0].setMap(map);
     }
     else if(majorNodes.length > 2){
         drawPath(majorNodes.length-2,majorNodes.length-1);
-        basic_path.getPath().push(location);
+        /*basic_path.getPath().push(location);*/
+        major_path.push(new google.maps.Polyline({path:[majorNodes[majorNodes.length-2].get_pos(),
+                                                     majorNodes[majorNodes.length-1].get_pos()],
+                        strokeColor: "#FFFF00",
+                        clickable: false,
+                        strokeOpacity: 0.7, 
+                        strokeWeight: 7, zIndex : basic_z }));        
     }
     fix_events();
 }
+
 
 function drawPath(start,end){
     if(start >=0 && start < majorNodes.length && 
