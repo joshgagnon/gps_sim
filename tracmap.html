@@ -1,0 +1,123 @@
+<html>
+<head>
+<title> Google Maps tracmap </title>
+<script type="text/javascript" src="http://maps.google.com/maps/api/js?sensor=false"></script>
+<script type="text/javascript" src="utm.js"></script>
+<script type="text/javascript" src="pointInPoly.js"></script>
+<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
+<script type="text/javascript" src="tracmap.js"></script>
+
+<style type="text/css">
+body{
+font-size:9pt;
+}
+#map{
+width:1000px;
+height:500px;
+float:left;
+}
+#coords{
+
+}
+.action_button{
+width:85px;
+font-size:9pt;
+}
+
+#top_row{
+float:left;
+}
+#errors{
+width:200px;
+float:left;
+}
+#errors label{
+display:block;
+clear:left;
+float:left;
+width:135px;
+line-height: 2em;
+}
+#main_col label+input{
+float:left;
+
+}
+#speed_boom{
+width:200px;
+float:left;
+}
+#speed_boom label{
+display:block;
+clear:left;
+float:left;
+width:100px;
+line-height: 2em;
+}
+#main_col{
+float:left;
+}
+#mode_pane{
+float:left;
+}
+#boom_pane{
+display:none;
+
+}
+#path_pane{
+
+}
+.boom_check_box{
+margin:3px;
+float:left;
+}
+</style>
+
+</head>
+
+<body onload="initialize();">
+  <div id="control_div"> 
+    <form id="control_form" method="" action="" onsubmit="return false">  
+      <div id="main_col">
+	<div id="top_row">
+	  <input type="button" class="action_button" id="start_input" name="start_input" value="Start GPS"/>
+	  <input type="button" class="action_button" id="drive_input" name="gogo_input" value="Drive"/>
+	  <input type="button" class="action_button" id="reset_input" name="reset_input" value="Reset"/>
+	  <input type="button" class="action_button" id="save_input" name="save_input" value="Save Macro"/> 
+	</div>
+	<div id="num_inputs">
+	  <div id="errors">
+	    <label for="forward_error">Forward Error (SD m)</label>
+	    <input type="text" class="number_field" id="forward_error" name="forward_error" value="0.1" size="3"/>
+	    <br/>
+	    <label for="side_error">Side Error (SD m)</label>
+	    <input type="text" class="number_field" id="side_error" name="side_error" value="0.3" size="3"/>
+	  </div>
+	  <div id="speed_boom">
+	    <label for="speed_input">Speed (km/h)</label>
+	    <input type="text" class="number_field" id="speed_input" name="speed_input" value="10.0" size="3"/>
+	    <br/>
+	    <label for="boom_input">Booms (Max 7)</label>
+	    <input type="text" class="number_field" id="boom_input" name="boom_input" value="3" size="3"/>
+	  </div>
+	</div>
+      </div>
+      <div id="mode_pane">
+	<input type="button" class="action_button" id="mode_input" name="mode_input" value="Path Mode"/>
+	<div id="path_pane">
+	  Click to place nodes.<br>
+	  Double click on a node to remove it. <br>
+	  Right click and drag on a node to move it.
+	</div>	
+	<div id="boom_pane">
+	</div>
+      </div>
+      
+    </form>
+
+</div>
+<div id="map"></div>
+<div id="coords"<div>
+</body>
+</html>
+
+
