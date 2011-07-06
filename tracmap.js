@@ -1,7 +1,7 @@
 
 var map;
 var basic_path;
-var major_path = [];
+var major_paths = [];
 var pathObjs = [];
 var majorNodes = [];
 var eventNodes = [];
@@ -31,7 +31,7 @@ var current_event = [0,0,0]; // major node, event node, tick count
 var path_mode = true;
 
 var selected_node = null;
-var moving_node = null;
+var moving_component = null;
 var vehicle;
 var boom_sentence = "$TMAAA,N,N,N,N,N,N,N,N\r\n";
 var gps_sim_boom_sentence = "booms N,N,N,N,N,N,N\n";
@@ -101,6 +101,26 @@ function vector_rad_to_deg(pos){
 
 function vector_deg_to_rad(pos){
     return [DegToRad(pos[0]),DegToRad(pos[1])];
+}
+
+function mid_point(p0,p1){
+    return new google.maps.LatLng( (p0.lat()+p1.lat())/2.0, (p0.lng()+p1.lng())/2.0);
+}
+
+function cubic_bezier(p0, p1, p2, p3, n){
+    pts = [];
+    for(var i=0;i<n;i++){
+        var t = i/(n-1);
+        a = Math.pow(1.0 - t,3);
+        b = 3.0 * t * Math.pow(1.0 - t, 2);
+        c = 3.0 * Math.pow(t,2) * (1.0 - t);
+        d = Math.pow(t,3);
+        x = (a * p0.lat() + b * p1.lat() + c * p2.lat() + d * p3.lat());
+        y = (a * p0.lng() + b * p1.lng() + c * p2.lng() + d * p3.lng());
+        pts.push(new google.maps.LatLng(x,y));
+    }
+    return pts;
+
 }
 
 /**************************************************************************/
@@ -220,15 +240,15 @@ function Draggable(_latLng){
         }
         this.moving = false;
         /* kludge ... consider another to figure this out */
-        if(moving_node != null && moving_node != this){
-            moving_node.mouse_up();
+        if(moving_component != null && moving_component != this){
+            moving_component.mouse_up();
         }
-        moving_node = null;
+        moving_component = null;
         return true;
     }
 
     this.mouse_down = function(){
-        moving_node = this;
+        moving_component = this;
         this.moving = true;
     }
 	
@@ -361,8 +381,9 @@ function MajorNode(latLng){
             }
             var i = majorNodes.indexOf(this);
             majorNodes.splice(i,1);			
-            basic_path.getPath().removeAt(i);
-            spliceOutPath(i);	
+            splice_out_major_path(i);
+            draw_major_path(i-1,i);
+            splice_out_path(i);	
             drawPath(i-1,i);
             fix_events();	
             return false;
@@ -374,8 +395,12 @@ function MajorNode(latLng){
             this.shape.setCenter(event.latLng);	
             this.latLng = event.latLng;
             var i = majorNodes.indexOf(this);
-            basic_path.getPath().removeAt(i);
-            basic_path.getPath().insertAt(i,event.latLng);
+            if(i-1 >= 0){
+                major_paths[i-1].set_path([majorNodes[i-1].get_pos(),majorNodes[i].get_pos()]);
+            }
+            if(i+1 < majorNodes.length){
+                major_paths[i].set_path([majorNodes[i].get_pos(),majorNodes[i+1].get_pos()]);
+            }
             this.has_moved = true;
             if(this.has_booms){
                 for(var i=0;i<boom_count;i++){
@@ -388,15 +413,26 @@ function MajorNode(latLng){
     this.finalize_move = function(){
         if(path_mode && this.has_moved){
             var i = majorNodes.indexOf(this);
-            spliceOutPath(i);
+            splice_out_path(i);
             drawPath(i-1,i);
             drawPath(i,i+1);
             fix_events();
             this.has_moved = false;
         }
     }
+    
+    var splice_out_major_path = function(i){
+        if(major_paths[i]){
+            major_paths[i].undraw();
+            major_paths.splice(i,1);
+        }
+        if(major_paths[i-1]){
+            major_paths[i-1].undraw();
+            major_paths.splice(i-1,1);
+        }
+    }
 
-    var spliceOutPath = function(i){
+    var splice_out_path = function(i){
         if(pathObjs[i]){
             pathObjs[i].setMap(null);
             pathObjs.splice(i,1);  
@@ -539,6 +575,7 @@ function MajorNode(latLng){
         }
         return false;
     }
+
     this.get_gps_sim_booms = function(){     
         var result = "booms ";
         var i;
@@ -627,7 +664,7 @@ function EventNode(latLng){
         return "lat " + this.latLng.lat()+ "\r\nlon "+ this.latLng.lng() + "\r\nhead " + 
         this.heading +"\r\nspeed "+(speed_s * 3.6) + "\r\n";
     }
-    google.maps.event.addListener(this.shape, 'click', bind(this, this.get_nmea));		
+    //google.maps.event.addListener(this.shape, 'click', bind(this, this.get_nmea));		
 }
 
 Vehicle.prototype = new Draggable();
@@ -669,8 +706,61 @@ function Vehicle(latLng){
             this.go_to_start();
         }
     }
-    /* implement find closest */
-    /* na */
+}
+
+MajorPath.prototype = new Draggable();
+MajorPath.prototype.constructor = MajorPath;
+function MajorPath(path){
+    this.start = path[0];
+    this.end = path[1];
+    this.path = path;
+    this.shape = new google.maps.Polyline({path:this.path,
+                                           strokeColor: "#FFFF00",
+                                           strokeOpacity: 0.7, 
+                                           strokeWeight: 7, zIndex : basic_z });
+    this.complex = false;
+    this.has_moved = false;
+    this.temp_shape = new google.maps.Polyline({path:[],
+                                                strokeColor: "#FF0000",
+                                                strokeOpacity: 1, 
+                                                strokeWeight: 2, zIndex : basic_z }); 
+    this.set_path = function(path){
+        this.path = path;
+        this.shape.setPath(path);
+        this.start = path[0];
+        this.end = path[path.length-1];
+    } 
+    this.move = function(event){
+        if(path_mode){ 
+            if(!this.complex){
+                this.complex = true;
+                this.path.splice(1,0,event.latLng);
+                this.temp_shape.setMap(map);
+            }
+            else{ //don't redo
+                this.path = [this.start,event.latLng, this.end];              
+            }
+            this.has_moved = true;
+            this.path[1] = event.latLng;
+            this.temp_shape.setPath(cubic_bezier(this.path[0],mid_point(this.path[0],this.path[1]), 
+                                                 mid_point(this.path[1],this.path[2]),this.path[2],17));
+            this.temp_shape.setMap(map);
+            this.shape.setPath(this.path);
+            
+        }
+    }
+    this.finalize_move = function(){
+        this.temp_shape.setMap(null);
+        if(path_mode && this.has_moved){
+            var huh = cubic_bezier(this.path[0],mid_point(this.path[0],this.path[1]), 
+                                   mid_point(this.path[1],this.path[2]),this.path[2],17);
+            
+            this.shape.setPath(huh);
+        }
+    }
+    
+    google.maps.event.addListener(this.shape, 'mousedown', bind(this, this.mouse_down));
+    google.maps.event.addListener(this.shape, 'mouseup', bind(this, this.mouse_up));
 }
 
 
@@ -713,33 +803,24 @@ function addMajorNode(location) {
     majorNodes.push(point);
 	
     if(majorNodes.length == 2){
-        drawPath(majorNodes.length-2,majorNodes.length-1);
-        /*basic_path = new google.maps.Polyline({path:[majorNodes[0].get_pos(),
-                                                     majorNodes[1].get_pos()],
-                                               strokeColor: "#FFFF00",
-                                               clickable: false,
-                                               strokeOpacity: 0.7, 
-                                               strokeWeight: 7, zIndex : basic_z });
-                                               basic_path.setMap(map);*/
-        major_path.push(new google.maps.Polyline({path:[majorNodes[0].get_pos(),
-                                                        majorNodes[1].get_pos()],
-                        strokeColor: "#FFFF00",
-                        clickable: false,
-                        strokeOpacity: 0.7, 
-                        strokeWeight: 7, zIndex : basic_z }));
-        major_path[0].setMap(map);
+        drawPath(majorNodes.length-2,majorNodes.length-1); 
+        draw_major_path(0,1);       
     }
     else if(majorNodes.length > 2){
         drawPath(majorNodes.length-2,majorNodes.length-1);
-        /*basic_path.getPath().push(location);*/
-        major_path.push(new google.maps.Polyline({path:[majorNodes[majorNodes.length-2].get_pos(),
-                                                     majorNodes[majorNodes.length-1].get_pos()],
-                        strokeColor: "#FFFF00",
-                        clickable: false,
-                        strokeOpacity: 0.7, 
-                        strokeWeight: 7, zIndex : basic_z }));        
+        draw_major_path(majorNodes.length-2,majorNodes.length-1);
+
     }
     fix_events();
+}
+
+
+function draw_major_path(start, end){
+    if(start >= 0 && end < majorNodes.length){
+        var new_path = new MajorPath([majorNodes[start].get_pos(),majorNodes[end].get_pos()]);
+        new_path.draw();
+        major_paths.splice(start,1,new_path);
+    }
 }
 
 
@@ -804,7 +885,7 @@ function drawPath(start,end){
 					      strokeColor: "#0000FF",
 					      clickable: false,strokeOpacity: 1.0, 
 					      strokeWeight: 2, zIndex : path_z });
-        track.setMap(map);
+        //track.setMap(map);
         pathObjs.splice(start,0,track); //here lol		
 	eventNodes.splice(start,0,nodes);
         
@@ -1018,6 +1099,7 @@ function initialize(){
     map = new google.maps.Map(document.getElementById("map"),opt);
 
     vehicle = new Vehicle(latlng);
+   
 
     google.maps.event.addListener(map, 'click', function(event){ 
             /* adding two modes, path mode and boom mode */
@@ -1030,15 +1112,15 @@ function initialize(){
         });
 	   	
     google.maps.event.addListener(map, 'mouseup', function(event){ 
-            if(moving_node != null){
-                moving_node.mouse_up();
+            if(moving_component != null){
+                moving_component.mouse_up();
             }
         });
 
     google.maps.event.addListener(map, 'mousemove', function(event){ 
             if(path_mode){
-                if(moving_node != null){
-                    moving_node.mouse_move(event);
+                if(moving_component != null){
+                    moving_component.mouse_move(event);
                 }
             }
         });	
