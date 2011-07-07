@@ -59,16 +59,31 @@ float:left;
 #mode_pane{
 float:left;
 }
+#mode_pane > input{
+float:left;
+}
 #boom_pane{
+clear:left;
+}
+.boom_panes{
 display:none;
-
 }
 #path_pane{
-
+clear:left;
 }
 .boom_check_box{
 margin:3px;
 float:left;
+}
+.infos{
+float:left;
+line-height:1em;
+padding-left: 5px;
+}
+#event_pane{
+clear:left;
+float:left;
+display:none;
 }
 </style>
 
@@ -103,12 +118,24 @@ float:left;
       </div>
       <div id="mode_pane">
 	<input type="button" class="action_button" id="mode_input" name="mode_input" value="Path Mode"/>
-	<div id="path_pane">
-	  Click to place a node, double click on it to remove it.<br>
-	  Right click and drag on a node to move it.
+	  <div id="path_info" class="path_panes infos">
+	    Click to place a node, double click on it to remove it.<br>
+	    Right click to pick up a node or path, right click again to drop it.
+	  </div>
+	<div id="path_pane" class="path_panes">
+	  <div id="event_pane">
+	  <div id="event_buttons">
+	    <input type="button" class="action_button" id="promote_event" name="promote_event" value="Promote"/> 
+	    <input type="button" class="action_button" id="edit_event" name="edit_event" value="Edit"/> 
+	  </div>
 	  <div id="nmea_sentence"></div>
+	  </div>
 	</div>	
-	<div id="boom_pane">
+	  <div id="boom_info" class="boom_panes infos">
+	    Click a blue node to select it, and change boom settings. <br>
+	    Double clicking will guess the configuration.
+	  </div>
+	<div id="boom_pane" class="boom_panes">
 	</div>
       </div>
       
