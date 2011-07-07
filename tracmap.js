@@ -1,6 +1,5 @@
 
 var map;
-var basic_path;
 var major_paths = [];
 var pathObjs = [];
 var majorNodes = [];
@@ -20,6 +19,7 @@ var r_error = 0.05;
 var ms_knots = 1.94384449;
 var boom_count = 1;
 var start_time = new Date();
+var curve_segments = 20;
 
 /* output controls */
 var go_timer = 0;
@@ -39,10 +39,10 @@ var gps_sim_boom_sentence = "booms N,N,N,N,N,N,N\n";
 /* z_indices */
 var vehicle_z = 7;
 var major_z = 2;
-var basic_z = 3;
+var basic_z = 1;
 var path_z = 5;
 var event_z = 9;
-var boom_z = 1
+var boom_z = 2;
 
 /**************************************************************************/
 
@@ -94,6 +94,24 @@ function traverse_vector(p1,p2,dist){
     var mag = dist/distance(p1,p2);
     return [p1[0]+vector[0]*mag,p1[1]+vector[1]*mag];
 }
+  
+function latlng_to_utm_array(array, result){
+    var length = 0;
+    var prev;
+    for(var i=0;i<array.length;i++){
+        var t = [0,0];
+        LatLonToUTMXY(DegToRad(array[i].lat()), 
+                      DegToRad(array[i].lng()),
+                      utm_zone,t);        
+        result.push(t);
+        if(i != 0){
+            length += distance(t,prev);
+        }
+        prev = t;
+    }
+    return length;
+}
+ 
 
 function vector_rad_to_deg(pos){
     return [RadToDeg(pos[0]),RadToDeg(pos[1])];
@@ -382,9 +400,15 @@ function MajorNode(latLng){
             var i = majorNodes.indexOf(this);
             majorNodes.splice(i,1);			
             splice_out_major_path(i);
+            if(i-1 >= 0){
+                splice_out_major_path(i-1);
+            }
             draw_major_path(i-1,i);
-            splice_out_path(i);	
-            drawPath(i-1,i);
+            splice_out_path(i);
+            if(i-1 >= 0){
+                splice_out_path(i-1);
+            }	
+            draw_event_path(i-1,i);
             fix_events();	
             return false;
         }
@@ -414,42 +438,17 @@ function MajorNode(latLng){
         if(path_mode && this.has_moved){
             var i = majorNodes.indexOf(this);
             splice_out_path(i);
-            drawPath(i-1,i);
-            drawPath(i,i+1);
+            if(i-1 >= 0){
+                splice_out_path(i-1);
+            }	          
+            draw_event_path(i-1,i);
+            draw_event_path(i,i+1);
             fix_events();
             this.has_moved = false;
         }
     }
     
-    var splice_out_major_path = function(i){
-        if(major_paths[i]){
-            major_paths[i].undraw();
-            major_paths.splice(i,1);
-        }
-        if(major_paths[i-1]){
-            major_paths[i-1].undraw();
-            major_paths.splice(i-1,1);
-        }
-    }
-
-    var splice_out_path = function(i){
-        if(pathObjs[i]){
-            pathObjs[i].setMap(null);
-            pathObjs.splice(i,1);  
-            eventNodes[i].forEach( function(node){ 
-                    node.undraw();
-                    });	 
-            eventNodes.splice(i,1); 
-        }
-        if(pathObjs[i-1]){
-            pathObjs[i-1].setMap(null);
-            pathObjs.splice(i-1,1);
-           eventNodes[i-1].forEach( function(node){ 
-                    node.undraw(); 						
-                    });	 
-            eventNodes.splice(i-1,1); 
-        }
-    }
+ 
 
     this.select = function(){
         selected_node = this; //?
@@ -595,6 +594,64 @@ function MajorNode(latLng){
 }
 
 
+MajorPath.prototype = new Draggable();
+MajorPath.prototype.constructor = MajorPath;
+function MajorPath(path){
+    this.start = path[0];
+    this.end = path[1];
+    this.path = path;
+    this.shape = new google.maps.Polyline({path:this.path,
+                                           strokeColor: "#FFFF00",
+                                           strokeOpacity: 0.7, 
+                                           strokeWeight: 7, zIndex : basic_z });   
+    this.has_moved = false;
+    this.first_move = true;
+    this.guide_shape = new google.maps.Polyline({path:[],
+                                                strokeColor: "#FF0000",
+                                                 strokeOpacity: 1, clickable: false,
+                                                strokeWeight: 2, zIndex : basic_z });
+    this.guide_path = [];
+    this.set_path = function(path){
+        this.path = path;
+        this.shape.setPath(path);
+        this.start = path[0];
+        this.end = path[path.length-1];
+    } 
+    this.move = function(event){
+        if(path_mode){ 
+            if(this.first_move){
+                this.first_move = false;
+                this.guide_path = [this.start,event.latLng,this.end];
+                this.guide_shape.setMap(map);
+            }         
+            this.guide_path[1] = event.latLng;              
+            this.guide_shape.setPath(this.guide_path);
+            this.has_moved = true;
+            this.path = cubic_bezier(this.guide_path[0],mid_point(this.guide_path[0],this.guide_path[1]), 
+                                     mid_point(this.guide_path[1],this.guide_path[2]),this.guide_path[2],
+                                     curve_segments);         
+            this.shape.setPath(this.path);
+            
+        }
+    }
+    this.finalize_move = function(){
+        this.guide_shape.setMap(null);
+        this.first_move = true;
+        if(path_mode && this.has_moved){             
+            var i = major_paths.indexOf(this);
+            splice_out_path(i);
+            draw_event_path(i,i+1);
+            fix_events();
+            this.has_moved = false;
+        }
+    }
+    
+    google.maps.event.addListener(this.shape, 'mousedown', bind(this, this.mouse_down));
+    google.maps.event.addListener(this.shape, 'mouseup', bind(this, this.mouse_up));
+}
+
+
+
 EventNode.prototype = new Draggable();
 EventNode.prototype.constructor = EventNode;
 function EventNode(latLng){
@@ -708,61 +765,6 @@ function Vehicle(latLng){
     }
 }
 
-MajorPath.prototype = new Draggable();
-MajorPath.prototype.constructor = MajorPath;
-function MajorPath(path){
-    this.start = path[0];
-    this.end = path[1];
-    this.path = path;
-    this.shape = new google.maps.Polyline({path:this.path,
-                                           strokeColor: "#FFFF00",
-                                           strokeOpacity: 0.7, 
-                                           strokeWeight: 7, zIndex : basic_z });
-    this.complex = false;
-    this.has_moved = false;
-    this.temp_shape = new google.maps.Polyline({path:[],
-                                                strokeColor: "#FF0000",
-                                                strokeOpacity: 1, 
-                                                strokeWeight: 2, zIndex : basic_z }); 
-    this.set_path = function(path){
-        this.path = path;
-        this.shape.setPath(path);
-        this.start = path[0];
-        this.end = path[path.length-1];
-    } 
-    this.move = function(event){
-        if(path_mode){ 
-            if(!this.complex){
-                this.complex = true;
-                this.path.splice(1,0,event.latLng);
-                this.temp_shape.setMap(map);
-            }
-            else{ //don't redo
-                this.path = [this.start,event.latLng, this.end];              
-            }
-            this.has_moved = true;
-            this.path[1] = event.latLng;
-            this.temp_shape.setPath(cubic_bezier(this.path[0],mid_point(this.path[0],this.path[1]), 
-                                                 mid_point(this.path[1],this.path[2]),this.path[2],17));
-            this.temp_shape.setMap(map);
-            this.shape.setPath(this.path);
-            
-        }
-    }
-    this.finalize_move = function(){
-        this.temp_shape.setMap(null);
-        if(path_mode && this.has_moved){
-            var huh = cubic_bezier(this.path[0],mid_point(this.path[0],this.path[1]), 
-                                   mid_point(this.path[1],this.path[2]),this.path[2],17);
-            
-            this.shape.setPath(huh);
-        }
-    }
-    
-    google.maps.event.addListener(this.shape, 'mousedown', bind(this, this.mouse_down));
-    google.maps.event.addListener(this.shape, 'mouseup', bind(this, this.mouse_up));
-}
-
 
 function fix_events(){
     var current_time = start_time;
@@ -797,18 +799,18 @@ function create_boom_box(){
 }
 
 	      	
-function addMajorNode(location) {
+function add_major_node(location) {
     var point = new MajorNode(location);
     point.draw();
     majorNodes.push(point);
 	
     if(majorNodes.length == 2){
-        drawPath(majorNodes.length-2,majorNodes.length-1); 
         draw_major_path(0,1);       
+        draw_event_path(majorNodes.length-2,majorNodes.length-1); 
     }
     else if(majorNodes.length > 2){
-        drawPath(majorNodes.length-2,majorNodes.length-1);
         draw_major_path(majorNodes.length-2,majorNodes.length-1);
+        draw_event_path(majorNodes.length-2,majorNodes.length-1);
 
     }
     fix_events();
@@ -823,8 +825,7 @@ function draw_major_path(start, end){
     }
 }
 
-
-function drawPath(start,end){
+function draw_event_path(start,end){
     if(start >=0 && start < majorNodes.length && 
        end > 0 && end < majorNodes.length){
         var start_utm=[0,0];
@@ -845,52 +846,71 @@ function drawPath(start,end){
         path_output.push(majorNodes[start].get_pos());
     
         var event = new EventNode(majorNodes[start].get_pos());
+        /* event need a heading */
         nodes.push(event);	
-        last_position = majorNodes[start].get_pos()
-           
-        while(true){
-            var remaining = distance(current_pos,end_utm);	
-            if(remaining < speed_t && remaining >0){
-                current_pos = traverse_vector(current_pos, end_utm, 
-                                              remaining);
+        prev_position = majorNodes[start].get_pos();
+        
+        var major_utm = [];
+        var major_path_i = 1;
+        var total_length = latlng_to_utm_array(major_paths[start].path, major_utm);       
+        var this_step_remaining = speed_t;
+        while(major_path_i < major_utm.length){
+            var length_to_next = distance(current_pos, major_utm[major_path_i]);
+            if(this_step_remaining > length_to_next){
+                current_pos = major_utm[major_path_i];
+                major_path_i++;
+                this_step_remaining -= length_to_next; 
+            }            
+            else{
+                current_pos = traverse_vector(current_pos,major_utm[major_path_i], 
+                                              this_step_remaining);
                 noisy_utm = add_noise_dual_variance(current_pos,
-                                                    unit_vector(get_vector(current_pos,end_utm)),
+                                                    unit_vector(get_vector(current_pos,
+                                                                           major_utm[major_path_i])),
                                                     f_error,r_error);
                 var noisy_latlon = [0,0];
                 UTMXYToLatLon(noisy_utm[0],noisy_utm[1],utm_zone,true,
                               noisy_latlon);
-                path_output.push(new google.maps.LatLng(RadToDeg(noisy_latlon[0]),
-                                                        RadToDeg(noisy_latlon[1])));
-                break;
-            }			
-            current_pos = traverse_vector(current_pos, end_utm, speed_t);
-            noisy_utm = add_noise_dual_variance(current_pos, 
-                                                unit_vector(get_vector(current_pos,end_utm)),
-                                                f_error,r_error);
-            var noisy_latlon = [0,0];
-            UTMXYToLatLon(noisy_utm[0],noisy_utm[1],
-                          utm_zone,true,noisy_latlon);
-            var position = new google.maps.LatLng(RadToDeg(noisy_latlon[0]),
-                                                  RadToDeg(noisy_latlon[1]));
-            path_output.push(position);
-            
-            var event = new EventNode(position);
-            event.set_heading_from(last_position);
-            nodes.push(event);	
-            last_position = position;
-            
+                var position = new google.maps.LatLng(RadToDeg(noisy_latlon[0]),
+                                                        RadToDeg(noisy_latlon[1]))
+                path_output.push(position);
+                var event = new EventNode(position);
+                event.set_heading_from(prev_position);
+                nodes.push(event);	
+                prev_position = position;
+                this_step_remaining= speed_t;                
+            }
         }
+        path_output.push(majorNodes[end].get_pos());
         
         var track = new google.maps.Polyline({path:path_output, 
 					      strokeColor: "#0000FF",
 					      clickable: false,strokeOpacity: 1.0, 
 					      strokeWeight: 2, zIndex : path_z });
-        //track.setMap(map);
+        track.setMap(map);
         pathObjs.splice(start,0,track); //here lol		
 	eventNodes.splice(start,0,nodes);
         
         current_event = [0,0,0];
         vehicle.fix();
+    }
+}
+
+function splice_out_major_path(i){
+    if(major_paths[i]){
+        major_paths[i].undraw();
+        major_paths.splice(i,1);
+    }
+}
+
+function splice_out_path(i){
+    if(pathObjs[i]){
+        pathObjs[i].setMap(null);
+        pathObjs.splice(i,1);  
+        eventNodes[i].forEach( function(node){ 
+                node.undraw();
+            });	 
+        eventNodes.splice(i,1); 
     }
 }
 
@@ -1019,11 +1039,13 @@ function initialize(){
 
                 }
                 if(!driving){                    
-                    $.post('tracmap.html', eventNodes[current_event[0]][current_event[1]].get_nmea(true,true)); 
+                    $.post('tracmap.html', 
+                           eventNodes[current_event[0]][current_event[1]].get_nmea(true,true)); 
                 }
                 else if(current_event[1] < eventNodes[current_event[0]].length){
                     vehicle.go_to(current_event[0],current_event[1]);
-                    $.post('tracmap.html',  {'stream':eventNodes[current_event[0]][current_event[1]].get_nmea(false,true)});
+                    $.post('tracmap.html',  
+                           {'stream':eventNodes[current_event[0]][current_event[1]].get_nmea(false,true)});
                     current_event[1]++;
                     if(current_event[1] >= eventNodes[current_event[0]].length){
                         current_event[0]++; current_event[1]=0;
@@ -1104,7 +1126,7 @@ function initialize(){
     google.maps.event.addListener(map, 'click', function(event){ 
             /* adding two modes, path mode and boom mode */
             if(path_mode){
-                addMajorNode(event.latLng);
+                add_major_node(event.latLng);
             }
             else{
                 
