@@ -23,7 +23,7 @@ def assign_serial():
     while 1:
         devices = ' '.join(os.listdir('/dev/'))
         usb = sorted(re.findall('(ttyUSB[0-9]+)', devices))
-        if len(usb) < 2:
+        if len(usb) < 1:
             time.sleep(1)
             continue
         output_gps = serial.Serial('/dev/'+usb[0],38400)
@@ -97,12 +97,12 @@ def clean_up(blah):
 
 if __name__ == "__main__":
     if 'help' in ''.join(sys.argv):
-        print 'Use --no_serial to disable serial out'
-        print '    --no_gtk to disable gtk browser'
-    if '--no_serial' not in sys.argv:
+        print 'Use --no-serial to disable serial out'
+        print '    --no-gtk to disable gtk browser'
+    if '--no-serial' not in sys.argv:
         no_serial = False
         assign_serial()
-    if '--no_gtk' not in sys.argv:
+    if '--no-gtk' not in sys.argv:
         view = View()
         view.start()
     start_server()
