@@ -10,7 +10,7 @@ import serial
 import os,re,urllib,urlparse,tempfile,sys
 
 FILE = 'tracmap.html'
-PORT = 8080
+PORT = 8081
 
 output_gps = None
 output_booms = None

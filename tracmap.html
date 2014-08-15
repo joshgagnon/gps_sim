@@ -12,9 +12,11 @@ body{
 font-size:9pt;
 }
 #map{
-width:1000px;
-height:500px;
-clear:left;
+position: absolute;
+top: 100px;
+left: 0;
+right: 0;
+bottom: 0;
 }
 #coords{
 float:left;
@@ -90,14 +92,14 @@ display:none;
 </head>
 
 <body onload="initialize();">
-  <div id="control_div"> 
-    <form id="control_form" method="" action="" onsubmit="return false">  
+  <div id="control_div">
+    <form id="control_form" method="" action="" onsubmit="return false">
       <div id="main_col">
 	<div id="top_row">
 	  <input type="button" class="action_button" id="start_input" name="start_input" value="Start GPS"/>
 	  <input type="button" class="action_button" id="drive_input" name="gogo_input" value="Drive"/>
 	  <input type="button" class="action_button" id="reset_input" name="reset_input" value="Reset"/>
-	  <input type="button" class="action_button" id="save_input" name="save_input" value="Save Macro"/> 
+	  <input type="button" class="action_button" id="save_input" name="save_input" value="Save Macro"/>
 	</div>
 	<div id="num_inputs">
 	  <div id="errors">
@@ -125,12 +127,12 @@ display:none;
 	<div id="path_pane" class="path_panes">
 	  <div id="event_pane">
 	  <div id="event_buttons">
-	    <input type="button" class="action_button" id="promote_event" name="promote_event" value="Promote"/> 
-	    <input type="button" class="action_button" id="edit_event" name="edit_event" value="Edit"/> 
+	    <input type="button" class="action_button" id="promote_event" name="promote_event" value="Promote"/>
+	    <input type="button" class="action_button" id="edit_event" name="edit_event" value="Edit"/>
 	  </div>
 	  <div id="nmea_sentence"></div>
 	  </div>
-	</div>	
+	</div>
 	  <div id="boom_info" class="boom_panes infos">
 	    Click a blue node to select it, and change boom settings. <br>
 	    Double clicking will guess the configuration.
@@ -138,7 +140,7 @@ display:none;
 	<div id="boom_pane" class="boom_panes">
 	</div>
       </div>
-      
+
     </form>
 
 </div>
